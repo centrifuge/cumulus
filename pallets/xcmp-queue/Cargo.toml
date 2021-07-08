@@ -24,6 +24,13 @@ xcm-executor = { git = "https://github.com/centrifuge/polkadot", default-feature
 # Cumulus Dependencies
 cumulus-primitives-core = { path = "../../primitives/core", default-features = false }
 
+[dev-dependencies]
+sp-core = { git = "https://github.com/centrifuge/substrate", version = '3.0.0' , branch = "master" }
+sp-io = { git = "https://github.com/centrifuge/substrate", version = '3.0.0' , branch = "master" }
+cumulus-pallet-parachain-system = { path = "../parachain-system" }
+xcm-builder = { git = "https://github.com/centrifuge/polkadot", branch = "centrifuge" }
+pallet-balances = { git = "https://github.com/centrifuge/substrate", version = '3.0.0' , branch = "master" }
+
 [features]
 default = [ "std" ]
 std = [

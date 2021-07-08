@@ -237,7 +237,7 @@ impl pallet_sudo::Config for Runtime {
 parameter_types! {
 	pub const AssetDeposit: Balance = 100 * UNITS; // 100 WND deposit to create asset
 	pub const ApprovalDeposit: Balance = EXISTENTIAL_DEPOSIT;
-	pub const StringLimit: u32 = 50;
+	pub const AssetsStringLimit: u32 = 50;
 	/// Key = 32 bytes, Value = 36 bytes (32+1+1+1+1)
 	// https://github.com/paritytech/substrate/blob/069917b/frame/assets/src/lib.rs#L257L271
 	pub const MetadataDepositBase: Balance = deposit(1, 68);
@@ -254,7 +254,7 @@ impl pallet_assets::Config for Runtime {
 	type MetadataDepositBase = MetadataDepositBase;
 	type MetadataDepositPerByte = MetadataDepositPerByte;
 	type ApprovalDeposit = ApprovalDeposit;
-	type StringLimit = StringLimit;
+	type StringLimit = AssetsStringLimit;
 	type Freezer = ();
 	type Extra = ();
 	type WeightInfo = weights::pallet_assets::WeightInfo<Runtime>;
@@ -313,7 +313,7 @@ pub enum ProxyType {
 	AssetOwner,
 	/// Asset manager. Can execute calls related to asset management.
 	AssetManager,
-	// Collator selection proxy. Can execute calls related to collator selection mechanism.
+	/// Collator selection proxy. Can execute calls related to collator selection mechanism.
 	Collator,
 }
 impl Default for ProxyType {
@@ -325,11 +325,7 @@ impl InstanceFilter<Call> for ProxyType {
 	fn filter(&self, c: &Call) -> bool {
 		match self {
 			ProxyType::Any => true,
-			ProxyType::NonTransfer => !matches!(
-				c,
-				Call::Balances(..)
-					| Call::Assets(..)
-			),
+			ProxyType::NonTransfer => !matches!(c, Call::Balances(..) | Call::Assets(..)),
 			ProxyType::CancelProxy => matches!(
 				c,
 				Call::Proxy(pallet_proxy::Call::reject_announcement(..))
@@ -576,6 +572,7 @@ impl pallet_aura::Config for Runtime {
 parameter_types! {
 	pub const PotId: PalletId = PalletId(*b"PotStake");
 	pub const MaxCandidates: u32 = 1000;
+	pub const MinCandidates: u32 = 1;
 	pub const SessionLength: BlockNumber = 6 * HOURS;
 	pub const MaxInvulnerables: u32 = 100;
 }
@@ -586,9 +583,13 @@ impl pallet_collator_selection::Config for Runtime {
 	type UpdateOrigin = EnsureRoot<AccountId>;
 	type PotId = PotId;
 	type MaxCandidates = MaxCandidates;
+	type MinCandidates = MinCandidates;
 	type MaxInvulnerables = MaxInvulnerables;
 	// should be a multiple of session or things will get inconsistent
 	type KickThreshold = Period;
+	type ValidatorId = <Self as frame_system::Config>::AccountId;
+	type ValidatorIdOf = pallet_collator_selection::IdentityCollator;
+	type ValidatorRegistration = Session;
 	type WeightInfo = weights::pallet_collator_selection::WeightInfo<Runtime>;
 }
 
@@ -728,8 +729,9 @@ impl_runtime_apis! {
 		fn validate_transaction(
 			source: TransactionSource,
 			tx: <Block as BlockT>::Extrinsic,
+			block_hash: <Block as BlockT>::Hash,
 		) -> TransactionValidity {
-			Executive::validate_transaction(source, tx)
+			Executive::validate_transaction(source, tx, block_hash)
 		}
 	}
 

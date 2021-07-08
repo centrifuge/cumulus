@@ -7,7 +7,7 @@ description = "Kusama variant of Statemint parachain runtime"
 
 [dependencies]
 serde = { version = "1.0.101", optional = true, features = ["derive"] }
-codec = { package = "parity-scale-codec", version = "2.0.0", default-features = false, features = ["derive"] }
+codec = { package = "parity-scale-codec", version = "2.0.0", default-features = false, features = ["derive", "max-encoded-len"] }
 log = { version = "0.4.14", default-features = false }
 parachain-info = { path = "../pallets/parachain-info", default-features = false }
 smallvec = "1.6.1"
@@ -26,6 +26,7 @@ sp-block-builder = { git = "https://github.com/centrifuge/substrate", default-fe
 sp-transaction-pool = { git = "https://github.com/centrifuge/substrate", default-features = false, branch = "master" }
 sp-inherents = { git = "https://github.com/centrifuge/substrate", default-features = false, branch = "master" }
 sp-consensus-aura = { git = "https://github.com/centrifuge/substrate", default-features = false, branch = "master" }
+max-encoded-len = { git = "https://github.com/centrifuge/substrate", default-features = false, branch = "master" }
 
 frame-benchmarking = { git = "https://github.com/centrifuge/substrate", optional = true, default-features = false, branch = "master" }
 frame-system-benchmarking = { git = "https://github.com/centrifuge/substrate", optional = true, default-features = false, branch = "master" }
@@ -49,7 +50,6 @@ pallet-uniques = { git = "https://github.com/centrifuge/substrate", default-feat
 pallet-utility = { git = "https://github.com/centrifuge/substrate", default-features = false, branch = "master" }
 
 node-primitives = { git = "https://github.com/centrifuge/substrate", default-features = false, branch = "master" }
-max-encoded-len = { git = "https://github.com/centrifuge/substrate", default-features = false, branch = "master" }
 
 # Cumulus dependencies
 cumulus-pallet-aura-ext = { path = "../../pallets/aura-ext", default-features = false }
@@ -120,6 +120,7 @@ std = [
 	"frame-executive/std",
 	"frame-system/std",
 	"frame-system-rpc-runtime-api/std",
+	"max-encoded-len/std",
 	"pallet-assets/std",
 	"pallet-authorship/std",
 	"pallet-aura/std",
