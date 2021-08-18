@@ -13,6 +13,7 @@ sp-api = { git = "https://github.com/centrifuge/substrate", branch = "master" }
 sp-core = { git = "https://github.com/centrifuge/substrate", branch = "master" }
 sp-maybe-compressed-blob = { git = "https://github.com/centrifuge/substrate", branch = "master" }
 sc-client-api = { git = "https://github.com/centrifuge/substrate", branch = "master" }
+sc-consensus = { git = "https://github.com/centrifuge/substrate", branch = "master" }
 
 # Polkadot deps
 polkadot-primitives = { git = "https://github.com/centrifuge/polkadot", branch = "centrifuge" }
@@ -44,7 +45,6 @@ sc-client-api = { git = "https://github.com/centrifuge/substrate", branch = "mas
 sp-core = { git = "https://github.com/centrifuge/substrate", branch = "master" }
 sp-keyring = { git = "https://github.com/centrifuge/substrate", branch = "master" }
 sp-keystore = { git = "https://github.com/centrifuge/substrate", branch = "master" }
-sp-consensus = { git = "https://github.com/centrifuge/substrate", branch = "master" }
 sc-cli = { git = "https://github.com/centrifuge/substrate", branch = "master" }
 substrate-test-utils = { git = "https://github.com/centrifuge/substrate", branch = "master" }
 sc-service = { git = "https://github.com/centrifuge/substrate", branch = "master" }

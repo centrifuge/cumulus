@@ -39,11 +39,11 @@ use sp_std::prelude::*;
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
-use codec::{Decode, Encode};
+use codec::{Decode, Encode, MaxEncodedLen};
 use constants::{currency::*, fee::WeightToFee};
 use frame_support::{
 	construct_runtime, match_type, parameter_types,
-	traits::{All, InstanceFilter, MaxEncodedLen},
+	traits::{Everything, InstanceFilter},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight},
 		DispatchClass, IdentityFee, Weight,
@@ -68,7 +68,7 @@ pub use sp_runtime::BuildStorage;
 use pallet_xcm::XcmPassthrough;
 use polkadot_parachain::primitives::Sibling;
 use polkadot_runtime_common::{BlockHashCount, RocksDbWeight, SlowAdjustingFeeUpdate};
-use xcm::v0::{Junction, MultiAsset, MultiLocation, NetworkId, Xcm};
+use xcm::v0::{Junction, MultiLocation, NetworkId};
 use xcm_builder::{
 	AccountId32Aliases, AllowTopLevelPaidExecutionFrom, AllowUnpaidExecutionFrom, CurrencyAdapter,
 	EnsureXcmOrigin, FixedWeightBounds, IsConcrete, LocationInverter, NativeAsset,
@@ -103,8 +103,8 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("westmint"),
 	impl_name: create_runtime_str!("westmint"),
 	authoring_version: 1,
-	spec_version: 1,
-	impl_version: 1,
+	spec_version: 3,
+	impl_version: 0,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
 };
@@ -144,9 +144,8 @@ parameter_types! {
 }
 
 // Configure FRAME pallets to include in runtime.
-
 impl frame_system::Config for Runtime {
-	type BaseCallFilter = ();
+	type BaseCallFilter = frame_support::traits::Everything;
 	type BlockWeights = RuntimeBlockWeights;
 	type BlockLength = RuntimeBlockLength;
 	type AccountId = AccountId;
@@ -234,6 +233,8 @@ impl pallet_sudo::Config for Runtime {
 	type Call = Call;
 }
 
+pub type AssetsForceOrigin =  EnsureRoot<AccountId>;
+
 parameter_types! {
 	pub const AssetDeposit: Balance = 100 * UNITS; // 100 WND deposit to create asset
 	pub const ApprovalDeposit: Balance = EXISTENTIAL_DEPOSIT;
@@ -249,7 +250,7 @@ impl pallet_assets::Config for Runtime {
 	type Balance = Balance;
 	type AssetId = u32;
 	type Currency = Balances;
-	type ForceOrigin = EnsureRoot<AccountId>;
+	type ForceOrigin = AssetsForceOrigin;
 	type AssetDeposit = AssetDeposit;
 	type MetadataDepositBase = MetadataDepositBase;
 	type MetadataDepositPerByte = MetadataDepositPerByte;
@@ -325,14 +326,20 @@ impl InstanceFilter<Call> for ProxyType {
 	fn filter(&self, c: &Call) -> bool {
 		match self {
 			ProxyType::Any => true,
-			ProxyType::NonTransfer => !matches!(c, Call::Balances(..) | Call::Assets(..)),
+			ProxyType::NonTransfer => !matches!(
+				c,
+				Call::Balances(..) | Call::Assets(..) | Call::Uniques(..)
+			),
 			ProxyType::CancelProxy => matches!(
 				c,
 				Call::Proxy(pallet_proxy::Call::reject_announcement(..))
 					| Call::Utility(..) | Call::Multisig(..)
 			),
 			ProxyType::Assets => {
-				matches!(c, Call::Assets(..) | Call::Utility(..) | Call::Multisig(..))
+				matches!(
+					c,
+					Call::Assets(..) | Call::Utility(..) | Call::Multisig(..) | Call::Uniques(..)
+				)
 			}
 			ProxyType::AssetOwner => matches!(
 				c,
@@ -342,6 +349,16 @@ impl InstanceFilter<Call> for ProxyType {
 					| Call::Assets(pallet_assets::Call::set_team(..))
 					| Call::Assets(pallet_assets::Call::set_metadata(..))
 					| Call::Assets(pallet_assets::Call::clear_metadata(..))
+					| Call::Uniques(pallet_uniques::Call::create(..))
+					| Call::Uniques(pallet_uniques::Call::destroy(..))
+					| Call::Uniques(pallet_uniques::Call::transfer_ownership(..))
+					| Call::Uniques(pallet_uniques::Call::set_team(..))
+					| Call::Uniques(pallet_uniques::Call::set_metadata(..))
+					| Call::Uniques(pallet_uniques::Call::set_attribute(..))
+					| Call::Uniques(pallet_uniques::Call::set_class_metadata(..))
+					| Call::Uniques(pallet_uniques::Call::clear_metadata(..))
+					| Call::Uniques(pallet_uniques::Call::clear_attribute(..))
+					| Call::Uniques(pallet_uniques::Call::clear_class_metadata(..))
 					| Call::Utility(..) | Call::Multisig(..)
 			),
 			ProxyType::AssetManager => matches!(
@@ -352,6 +369,12 @@ impl InstanceFilter<Call> for ProxyType {
 					| Call::Assets(pallet_assets::Call::thaw(..))
 					| Call::Assets(pallet_assets::Call::freeze_asset(..))
 					| Call::Assets(pallet_assets::Call::thaw_asset(..))
+					| Call::Uniques(pallet_uniques::Call::mint(..))
+					| Call::Uniques(pallet_uniques::Call::burn(..))
+					| Call::Uniques(pallet_uniques::Call::freeze(..))
+					| Call::Uniques(pallet_uniques::Call::thaw(..))
+					| Call::Uniques(pallet_uniques::Call::freeze_class(..))
+					| Call::Uniques(pallet_uniques::Call::thaw_class(..))
 					| Call::Utility(..) | Call::Multisig(..)
 			),
 			ProxyType::Collator => matches!(
@@ -477,7 +500,7 @@ match_type! {
 
 pub type Barrier = (
 	TakeWeightCredit,
-	AllowTopLevelPaidExecutionFrom<All<MultiLocation>>,
+	AllowTopLevelPaidExecutionFrom<Everything>,
 	AllowUnpaidExecutionFrom<ParentOrParentsPlurality>,
 	// ^^^ Parent & its plurality gets free execution
 );
@@ -519,11 +542,12 @@ impl pallet_xcm::Config for Runtime {
 	type SendXcmOrigin = EnsureXcmOrigin<Origin, LocalOriginToLocation>;
 	type XcmRouter = XcmRouter;
 	type ExecuteXcmOrigin = EnsureXcmOrigin<Origin, LocalOriginToLocation>;
-	type XcmExecuteFilter = All<(MultiLocation, Xcm<Call>)>;
+	type XcmExecuteFilter = Everything;
 	type XcmExecutor = XcmExecutor<XcmConfig>;
-	type XcmTeleportFilter = All<(MultiLocation, Vec<MultiAsset>)>;
-	type XcmReserveTransferFilter = All<(MultiLocation, Vec<MultiAsset>)>;
+	type XcmTeleportFilter = Everything;
+	type XcmReserveTransferFilter = Everything;
 	type Weigher = FixedWeightBounds<UnitWeightCost, Call>;
+	type LocationInverter = LocationInverter<Ancestry>;
 }
 
 impl cumulus_pallet_xcm::Config for Runtime {
@@ -567,6 +591,7 @@ impl pallet_session::Config for Runtime {
 
 impl pallet_aura::Config for Runtime {
 	type AuthorityId = AuraId;
+	type DisabledValidators = ();
 }
 
 parameter_types! {
@@ -593,6 +618,34 @@ impl pallet_collator_selection::Config for Runtime {
 	type WeightInfo = weights::pallet_collator_selection::WeightInfo<Runtime>;
 }
 
+parameter_types! {
+	pub const ClassDeposit: Balance = UNITS; // 1 UNIT deposit to create asset class
+	pub const InstanceDeposit: Balance = UNITS / 100; // 1/100 UNIT deposit to create asset instance
+	pub const KeyLimit: u32 = 32;	// Max 32 bytes per key
+	pub const ValueLimit: u32 = 64;	// Max 64 bytes per value
+	pub const UniquesMetadataDepositBase: Balance = deposit(1, 129);
+	pub const AttributeDepositBase: Balance = deposit(1, 0);
+	pub const DepositPerByte: Balance = deposit(0, 1);
+	pub const UniquesStringLimit: u32 = 128;
+}
+
+impl pallet_uniques::Config for Runtime {
+	type Event = Event;
+	type ClassId = u32;
+	type InstanceId = u32;
+	type Currency = Balances;
+	type ForceOrigin = AssetsForceOrigin;
+	type ClassDeposit = ClassDeposit;
+	type InstanceDeposit = InstanceDeposit;
+	type MetadataDepositBase = UniquesMetadataDepositBase;
+	type AttributeDepositBase = AttributeDepositBase;
+	type DepositPerByte = DepositPerByte;
+	type StringLimit = UniquesStringLimit;
+	type KeyLimit = KeyLimit;
+	type ValueLimit = ValueLimit;
+	type WeightInfo = weights::pallet_uniques::WeightInfo<Runtime>;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
@@ -602,7 +655,9 @@ construct_runtime!(
 	{
 		// System support stuff;
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
-		ParachainSystem: cumulus_pallet_parachain_system::{Pallet, Call, Config, Storage, Inherent, Event<T>},
+		ParachainSystem: cumulus_pallet_parachain_system::{
+			Pallet, Call, Config, Storage, Inherent, Event<T>, ValidateUnsigned,
+		},
 		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet, Storage},
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 		ParachainInfo: parachain_info::{Pallet, Storage, Config},
@@ -630,6 +685,9 @@ construct_runtime!(
 		PolkadotXcm: pallet_xcm::{Pallet, Call, Event<T>, Origin},
 		CumulusXcm: cumulus_pallet_xcm::{Pallet, Event<T>, Origin},
 		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>},
+
+		// More things for the main stage
+		Uniques: pallet_uniques::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
@@ -668,8 +726,9 @@ pub type Executive = frame_executive::Executive<
 pub struct OnRuntimeUpgrade;
 impl frame_support::traits::OnRuntimeUpgrade for OnRuntimeUpgrade {
 	fn on_runtime_upgrade() -> u64 {
-		sp_io::storage::set(b":c", &[]);
-		RocksDbWeight::get().writes(1)
+		frame_support::migrations::migrate_from_pallet_version_to_storage_version::<
+			AllPalletsWithSystem,
+		>(&RocksDbWeight::get())
 	}
 }
 
